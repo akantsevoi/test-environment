@@ -1,7 +1,15 @@
 .PHONY: build maroon-redeploy cluster-start cluster-delete maroon-logs
 
 build:
+	# worker container
 	docker build -t maroon:latest .
+
+build-test:
+	# test scripts
+	go build -o bin/test-node-failure scripts/test/node-failure/main.go
+
+test-kill-restore:
+	./bin/test-node-failure
 
 maroon-redeploy:
 	kubectl delete -f deploy/maroon/maroon-deployment.yaml
@@ -38,3 +46,4 @@ cluster-delete:
 
 maroon-logs:
 	kubectl logs -l app=maroon --follow --prefix
+
