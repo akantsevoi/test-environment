@@ -4,11 +4,11 @@ metadata:
   name: etcd
   namespace: default
 spec:
+  serviceName: "etcd"
+  replicas: 3
   selector:
     matchLabels:
       app: etcd
-  serviceName: "etcd"
-  replicas: 3
   template:
     metadata:
       labels:

@@ -15,3 +15,6 @@ Test environment for maroon migrator
 ## Troubleshooting:
 Checks etcd status:
 `kubectl exec etcd-0 -- etcdctl endpoint status --endpoints=http://etcd-0.etcd:2379,http://etcd-1.etcd:2379,http://etcd-2.etcd:2379 -w table`
+
+DNS maroon:
+`kubectl exec -it maroon-0 -- nslookup maroon-0.maroon.default.svc.cluster.local`

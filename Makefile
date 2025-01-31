@@ -5,8 +5,10 @@ build:
 
 maroon-redeploy:
 	kubectl delete -f deploy/maroon/maroon-deployment.yaml
+	kubectl delete -f deploy/maroon/maroon-service.yaml
 	docker build -t maroon:latest .
 	kind load docker-image maroon:latest --name oltp-multi-region
+	kubectl apply -f deploy/maroon/maroon-service.yaml
 	kubectl apply -f deploy/maroon/maroon-deployment.yaml
 
 cluster-start:
@@ -14,8 +16,9 @@ cluster-start:
 
 	kind load docker-image maroon:latest --name oltp-multi-region
 
-	kubectl apply -f deploy/etcd/etcd.yaml
 	kubectl apply -f deploy/etcd/etcd-service.yaml
+	kubectl apply -f deploy/etcd/etcd.yaml
+	
 
 	echo 'wait etcd-0'
 	kubectl wait --for=condition=Ready pod/etcd-0
@@ -26,6 +29,8 @@ cluster-start:
 
 	echo 'etcd started'
 
+	kubectl apply -f deploy/maroon/maroon-service.yaml
+	sleep 1 # TODO: some weird behavior on DNS resolution
 	kubectl apply -f deploy/maroon/maroon-deployment.yaml
 
 cluster-delete:

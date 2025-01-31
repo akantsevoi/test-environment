@@ -1,8 +1,10 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: maroon
+  namespace: default
 spec:
+  serviceName: "maroon"
   replicas: 3
   selector:
     matchLabels:
@@ -16,6 +18,9 @@ spec:
       - name: maroon
         image: maroon:latest
         imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: tcp
         env:
         - name: POD_NAME
           valueFrom:
