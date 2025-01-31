@@ -7,8 +7,9 @@ Test environment for maroon migrator
 `go install sigs.k8s.io/kind@v0.26.0`
 
 ## Run
-`make build`
+`make build`  
 `make cluster-start`
+`make test-kill-restore` # will find and kill leader-node
 
 `make cluster-delete`
 
@@ -18,3 +19,7 @@ Checks etcd status:
 
 DNS maroon:
 `kubectl exec -it maroon-0 -- nslookup maroon-0.maroon.default.svc.cluster.local`
+
+## Maroon-application
+
+`cmd/app/main.go`
