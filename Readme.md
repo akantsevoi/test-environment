@@ -8,9 +8,9 @@ Test environment for maroon migrator
 
 ## Run
 `make build`
-`make start-cluster`
+`make cluster-start`
 
-`make delete-cluster`
+`make cluster-delete`
 
 ## Troubleshooting:
 Checks etcd status:

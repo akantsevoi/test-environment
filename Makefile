@@ -1,15 +1,15 @@
-.PHONY: build redeploy-maroon start-cluser delete-cluster work-logs
+.PHONY: build maroon-redeploy cluster-start cluster-delete maroon-logs
 
 build:
 	docker build -t maroon:latest .
 
-redeploy-maroon:
+maroon-redeploy:
 	kubectl delete -f deploy/maroon/maroon-deployment.yaml
 	docker build -t maroon:latest .
 	kind load docker-image maroon:latest --name oltp-multi-region
 	kubectl apply -f deploy/maroon/maroon-deployment.yaml
 
-start-cluster:
+cluster-start:
 	kind create cluster --config deploy/cluster/kind-config.yaml
 
 	kind load docker-image maroon:latest --name oltp-multi-region
@@ -28,7 +28,7 @@ start-cluster:
 
 	kubectl apply -f deploy/maroon/maroon-deployment.yaml
 
-delete-cluster:
+cluster-delete:
 	kind delete cluster --name oltp-multi-region
 
 maroon-logs:
