@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maroon
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: maroon
+  template:
+    metadata:
+      labels:
+        app: maroon
+    spec:
+      containers:
+      - name: maroon
+        image: maroon:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ETCD_ENDPOINTS
+          value: "http://etcd-0.etcd:2379,http://etcd-1.etcd:2379,http://etcd-2.etcd:2379"

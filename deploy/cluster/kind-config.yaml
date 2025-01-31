@@ -1,0 +1,21 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: oltp-multi-region
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30000
+        hostPort: 30000
+
+  - role: worker
+    labels:
+      region: region1
+      tier: compute-instance
+  - role: worker
+    labels:
+      region: region1
+      tier: compute-instance
+  - role: worker
+    labels:
+      region: region1
+      tier: compute-instance
