@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"strings"
 	"time"
@@ -12,48 +11,6 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 )
-
-func startTCPServer() {
-	listener, err := net.Listen("tcp", ":8080")
-	if err != nil {
-		log.Fatalf("Failed to start TCP server: %v", err)
-	}
-	defer listener.Close()
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Printf("Failed to accept connection: %v", err)
-			continue
-		}
-		go handleConnection(conn)
-	}
-}
-
-func handleConnection(conn net.Conn) {
-	defer conn.Close()
-
-	buffer := make([]byte, 1024)
-	n, err := conn.Read(buffer)
-	if err != nil {
-		log.Printf("Error reading from connection: %v", err)
-		return
-	}
-
-	message := string(buffer[:n])
-	log.Printf("Received message: %s", message)
-}
-
-func sendMessage(targetPod string, message string) error {
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s.maroon:8080", targetPod))
-	if err != nil {
-		return fmt.Errorf("failed to connect to %s: %v", targetPod, err)
-	}
-	defer conn.Close()
-
-	_, err = conn.Write([]byte(message))
-	return err
-}
 
 func main() {
 	podName := os.Getenv("POD_NAME")
@@ -63,7 +20,8 @@ func main() {
 	log.Printf("Starting maroon pod: %s", podName)
 
 	// Start TCP server in a separate goroutine
-	go startTCPServer()
+	server := NewTCPServer(8080)
+	go server.Start()
 
 	etcdEndpoints := os.Getenv("ETCD_ENDPOINTS")
 	if etcdEndpoints == "" {
@@ -103,7 +61,6 @@ func main() {
 		if err == nil {
 			log.Printf("Current leader: %s", string(leader.Kvs[0].Value))
 			if string(leader.Kvs[0].Value) != podName {
-				// We're not the leader, wait and observe
 				time.Sleep(1 * time.Second)
 				continue
 			}
@@ -121,7 +78,6 @@ func main() {
 
 		log.Printf("Pod %s became leader", podName)
 
-		// In the leader loop, send messages to other pods
 	leaderLoop:
 		for {
 			select {
@@ -129,11 +85,10 @@ func main() {
 				log.Printf("Lost leadership due to session termination")
 				break leaderLoop
 			default:
-				// Send message to other pods
 				for i := 0; i < 3; i++ {
 					targetPod := fmt.Sprintf("maroon-%d", i)
 					if targetPod != podName {
-						err := sendMessage(targetPod, fmt.Sprintf("Hello from leader %s", podName))
+						err := server.SendMessage(targetPod, fmt.Sprintf("Hello from leader %s", podName))
 						if err != nil {
 							log.Printf("Failed to send message to %s: %v", targetPod, err)
 						}
