@@ -83,20 +83,13 @@ func main() {
 	defer cli.Close()
 	log.Printf("Connected to etcd successfully")
 
-	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	// defer cancel()
-	// _, err = cli.Get(ctx, "test-key")
-	// if err != nil {
-	// 	log.Fatalf("failed to perform test Get operation: %v", err)
-	// }
-	// log.Printf("Test Get operation successful")
-
 	log.Printf("Creating etcd session...")
-	session, err := concurrency.NewSession(cli, concurrency.WithTTL(10))
+	session, err := concurrency.NewSession(cli, concurrency.WithTTL(3))
 	if err != nil {
 		log.Fatalf("failed to create session: %v", err)
 	}
 	defer session.Close()
+
 	log.Printf("Session created successfully")
 
 	log.Printf("Creating election...")
@@ -104,14 +97,14 @@ func main() {
 	log.Printf("Election created")
 
 	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		leader, err := election.Leader(ctx)
 		cancel()
 		if err == nil {
 			log.Printf("Current leader: %s", string(leader.Kvs[0].Value))
 			if string(leader.Kvs[0].Value) != podName {
 				// We're not the leader, wait and observe
-				time.Sleep(5 * time.Second)
+				time.Sleep(1 * time.Second)
 				continue
 			}
 		}
@@ -147,7 +140,7 @@ func main() {
 					}
 				}
 				log.Printf("Leader is working. Ping")
-				time.Sleep(5 * time.Second)
+				time.Sleep(1 * time.Second)
 			}
 		}
 

@@ -1,4 +1,4 @@
-.PHONY: build maroon-redeploy cluster-start cluster-delete maroon-logs
+.PHONY: build maroon-redeploy cluster-start cluster-delete maroon-logs test-kill-restore
 
 build:
 	# worker container
@@ -8,7 +8,7 @@ build-test:
 	# test scripts
 	go build -o bin/test-node-failure scripts/test/node-failure/main.go
 
-test-kill-restore:
+test-kill-restore: build-test
 	./bin/test-node-failure
 
 maroon-redeploy:
