@@ -13,40 +13,17 @@ import (
 )
 
 func main() {
-	podName := os.Getenv("POD_NAME")
-	if podName == "" {
-		log.Fatal("POD_NAME environment variable is required")
-	}
+	vars := envs()
+	podName := vars.podName
 	log.Printf("Starting maroon pod: %s", podName)
+	log.Printf("Using etcd endpoints: %v", vars.etcdEndpoints)
 
 	// Start TCP server in a separate goroutine
 	server := NewTCPServer(8080)
 	go server.Start()
 
-	etcdEndpoints := os.Getenv("ETCD_ENDPOINTS")
-	if etcdEndpoints == "" {
-		log.Fatal("ETCD_ENDPOINTS environment variable is required")
-	}
-	endpoints := strings.Split(etcdEndpoints, ",")
-	log.Printf("Using etcd endpoints: %v", endpoints)
-
-	log.Printf("Connecting to etcd...")
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
-		DialTimeout: 5 * time.Second,
-	})
-	if err != nil {
-		log.Fatalf("failed to create etcd client: %v", err)
-	}
-	defer cli.Close()
-	log.Printf("Connected to etcd successfully")
-
-	log.Printf("Creating etcd session...")
-	session, err := concurrency.NewSession(cli, concurrency.WithTTL(3))
-	if err != nil {
-		log.Fatalf("failed to create session: %v", err)
-	}
-	defer session.Close()
+	session, shutdown := etcdSession(vars.etcdEndpoints)
+	defer shutdown()
 
 	log.Printf("Session created successfully")
 
@@ -100,5 +77,53 @@ func main() {
 		}
 
 		time.Sleep(1 * time.Second)
+	}
+}
+
+type envVariables struct {
+	podName       string
+	etcdEndpoints []string
+}
+
+func envs() envVariables {
+	podName := os.Getenv("POD_NAME")
+	if podName == "" {
+		log.Fatal("POD_NAME environment variable is required")
+	}
+
+	etcdEndpoints := os.Getenv("ETCD_ENDPOINTS")
+	if etcdEndpoints == "" {
+		log.Fatal("ETCD_ENDPOINTS environment variable is required")
+	}
+	endpoints := strings.Split(etcdEndpoints, ",")
+
+	return envVariables{
+		podName:       podName,
+		etcdEndpoints: endpoints,
+	}
+}
+
+func etcdSession(endpoints []string) (*concurrency.Session, func()) {
+	log.Printf("Connecting to etcd...")
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   endpoints,
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		log.Fatalf("failed to create etcd client: %v", err)
+	}
+	log.Printf("Connected to etcd successfully")
+
+	log.Printf("Creating etcd session...")
+	session, err := concurrency.NewSession(cli, concurrency.WithTTL(3))
+	if err != nil {
+		log.Fatalf("failed to create session: %v", err)
+	}
+
+	log.Printf("Session created successfully")
+
+	return session, func() {
+		session.Close()
+		cli.Close()
 	}
 }
