@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/akantsevoi/test-environment/pkg/election"
+	"github.com/akantsevoi/test-environment/pkg/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -19,8 +20,8 @@ const (
 func main() {
 	vars := envs()
 	podName := vars.podName
-	log.Printf("Starting maroon pod: %s", podName)
-	log.Printf("Using etcd endpoints: %v", vars.etcdEndpoints)
+	logger.Infof(logger.Application, "Starting maroon pod: %s", podName)
+	logger.Infof(logger.Application, "Using etcd endpoints: %v", vars.etcdEndpoints)
 
 	server := NewTCPServer(8080)
 	go server.Start()
@@ -30,7 +31,8 @@ func main() {
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
-		log.Fatalf("failed to create etcd client: %v", err)
+		logger.Errorf(logger.Application, "failed to create etcd client: %v", err)
+		os.Exit(1)
 	}
 	defer cli.Close()
 
@@ -43,12 +45,12 @@ func main() {
 	for {
 		leaderCh, err := leader.Campaign()
 		if err != nil {
-			log.Printf("Failed to campaign: %v", err)
+			logger.Errorf(logger.Election, "failed to campaign: %v", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		log.Printf("Pod %s became leader", podName)
+		logger.Infof(logger.Election, "pod %s became leader", podName)
 
 		// Start application logic in a separate goroutine
 		stopCh := make(chan struct{})
@@ -57,7 +59,7 @@ func main() {
 		// Wait for leadership loss
 		<-leaderCh
 		close(stopCh)
-		log.Printf("Lost leadership")
+		logger.Infof(logger.Election, "lost leadership")
 
 		time.Sleep(1 * time.Second)
 	}
@@ -84,12 +86,12 @@ type envVariables struct {
 func envs() envVariables {
 	podName := os.Getenv("POD_NAME")
 	if podName == "" {
-		log.Fatal("POD_NAME environment variable is required")
+		logger.Fatalf(logger.Application, "POD_NAME environment variable is required")
 	}
 
 	etcdEndpoints := os.Getenv("ETCD_ENDPOINTS")
 	if etcdEndpoints == "" {
-		log.Fatal("ETCD_ENDPOINTS environment variable is required")
+		logger.Fatalf(logger.Application, "ETCD_ENDPOINTS environment variable is required")
 	}
 	endpoints := strings.Split(etcdEndpoints, ",")
 

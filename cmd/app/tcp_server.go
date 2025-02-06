@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
+
+	"github.com/akantsevoi/test-environment/pkg/logger"
 )
 
 type TCPServer struct {
@@ -19,14 +20,14 @@ func NewTCPServer(port int) *TCPServer {
 func (s *TCPServer) Start() {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.port))
 	if err != nil {
-		log.Fatalf("Failed to start TCP server: %v", err)
+		logger.Fatalf(logger.Network, "Failed to start TCP server: %v", err)
 	}
 	defer listener.Close()
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Printf("Failed to accept connection: %v", err)
+			logger.Errorf(logger.Network, "Failed to accept connection: %v", err)
 			continue
 		}
 		go s.handleConnection(conn)
@@ -39,12 +40,12 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 	buffer := make([]byte, 1024)
 	n, err := conn.Read(buffer)
 	if err != nil {
-		log.Printf("Error reading from connection: %v", err)
+		logger.Errorf(logger.Network, "Error reading from connection: %v", err)
 		return
 	}
 
 	message := string(buffer[:n])
-	log.Printf("Received message: %s", message)
+	logger.Infof(logger.Network, "Received message: %s", message)
 }
 
 func (s *TCPServer) SendMessage(targetPod string, message string) error {
