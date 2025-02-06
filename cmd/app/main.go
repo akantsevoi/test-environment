@@ -2,14 +2,12 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/akantsevoi/test-environment/pkg/election"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -40,82 +38,26 @@ func main() {
 	watchChan := cli.Watch(context.Background(), hashesKey+"/", clientv3.WithPrefix())
 	go watchHashes(watchChan)
 
+	leader := election.NewLeader(cli, leaderKey, podName)
+
 	for {
-		// Create lease
-		lease, err := cli.Grant(context.Background(), 10)
+		leaderCh, err := leader.Campaign()
 		if err != nil {
-			log.Printf("Failed to create lease: %v", err)
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		// Try to become leader using transaction
-		resp, err := cli.Txn(context.Background()).
-			If(clientv3.Compare(clientv3.Version(leaderKey), "=", 0)).
-			Then(clientv3.OpPut(leaderKey, podName, clientv3.WithLease(lease.ID))).
-			Else(clientv3.OpGet(leaderKey)).
-			Commit()
-		if err != nil {
-			log.Printf("Failed to execute leader transaction: %v", err)
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		if !resp.Succeeded {
-			currentLeader := string(resp.Responses[0].GetResponseRange().Kvs[0].Value)
-			log.Printf("Current leader is: %s", currentLeader)
+			log.Printf("Failed to campaign: %v", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
 		log.Printf("Pod %s became leader", podName)
 
-		// Keep lease alive
-		keepAliveCh, err := cli.KeepAlive(context.Background(), lease.ID)
-		if err != nil {
-			log.Printf("Failed to keep lease alive: %v", err)
-			time.Sleep(1 * time.Second)
-			continue
-		}
+		// Start application logic in a separate goroutine
+		stopCh := make(chan struct{})
+		go runApplication(cli, podName, server, stopCh)
 
-	leaderLoop:
-		for {
-			select {
-			case _, ok := <-keepAliveCh:
-				if !ok {
-					log.Printf("Lost lease")
-					break leaderLoop
-				}
-			default:
-				timestamp := time.Now().Unix()
-				hash := sha256.Sum256([]byte(strconv.FormatInt(timestamp, 10)))
-				hashStr := fmt.Sprintf("%x", hash)
-
-				key := fmt.Sprintf("%s/%d", hashesKey, timestamp)
-				_, err = cli.Txn(context.Background()).
-					If(clientv3.Compare(clientv3.Value(leaderKey), "=", podName)).
-					Then(clientv3.OpPut(key, hashStr)).
-					Commit()
-				if err != nil {
-					log.Printf("Failed to write hash: %v", err)
-				} else {
-					log.Printf("Published hash: %s", hashStr)
-				}
-
-				// Send TCP messages to other pods
-				// for i := 0; i < 3; i++ {
-				// 	targetPod := fmt.Sprintf("maroon-%d", i)
-				// 	if targetPod != podName {
-				// 		err := server.SendMessage(targetPod, fmt.Sprintf("Hash: %s", hashStr))
-				// 		if err != nil {
-				// 			log.Printf("Failed to send message to %s: %v", targetPod, err)
-				// 		}
-				// 	}
-				// }
-
-				time.Sleep(1 * time.Second)
-			}
-		}
+		// Wait for leadership loss
+		<-leaderCh
+		close(stopCh)
+		log.Printf("Lost leadership")
 
 		time.Sleep(1 * time.Second)
 	}
