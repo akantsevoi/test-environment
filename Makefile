@@ -47,3 +47,14 @@ cluster-delete:
 maroon-logs:
 	kubectl logs -l app=maroon --follow --prefix
 
+cluster-add-delays:
+	for node in $$(docker ps --filter "name=oltp-multi-region-work*" --format "{{.Names}}"); do \
+    	echo "Adding delay to $$node"; \
+    	docker exec "$$node" tc qdisc add dev eth0 root netem delay 50ms; \
+	done
+
+cluster-remove-delays:
+	for node in $$(docker ps --filter "name=oltp-multi-region-work*" --format "{{.Names}}"); do \
+		echo "Removing delay from $$node"; \
+		docker exec "$$node" tc qdisc del dev eth0 root || true; \
+	done

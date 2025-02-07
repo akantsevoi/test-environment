@@ -2,82 +2,76 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/akantsevoi/test-environment/pkg/election"
+	"github.com/akantsevoi/test-environment/pkg/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/client/v3/concurrency"
+)
+
+const (
+	leaderKey = "/maroon/leader"
+	hashesKey = "/maroon/hashes"
 )
 
 func main() {
 	vars := envs()
 	podName := vars.podName
-	log.Printf("Starting maroon pod: %s", podName)
-	log.Printf("Using etcd endpoints: %v", vars.etcdEndpoints)
+	logger.Infof(logger.Application, "Starting maroon pod: %s", podName)
+	logger.Infof(logger.Application, "Using etcd endpoints: %v", vars.etcdEndpoints)
 
-	// Start TCP server in a separate goroutine
-	server := NewTCPServer(8080)
+	// start TCP server
+	server, incomingMessages := NewTCPServer(8080)
 	go server.Start()
 
-	session, shutdown := etcdSession(vars.etcdEndpoints)
-	defer shutdown()
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   vars.etcdEndpoints,
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		logger.Errorf(logger.Application, "failed to create etcd client: %v", err)
+		os.Exit(1)
+	}
+	defer cli.Close()
 
-	log.Printf("Session created successfully")
+	// watching hashes
+	watchChan := cli.Watch(context.Background(), hashesKey+"/", clientv3.WithPrefix())
 
-	log.Printf("Creating election...")
-	election := concurrency.NewElection(session, "/election")
-	log.Printf("Election created")
+	// Start application logic in a separate goroutine
+	stopCh := make(chan struct{})
+	isLeaderCh := make(chan bool)
+	go runApplication(cli, podName, server, isLeaderCh, incomingMessages, watchChan, stopCh)
+	isLeaderCh <- false
+
+	leader := election.NewLeader(cli, leaderKey, podName)
 
 	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		leader, err := election.Leader(ctx)
-		cancel()
-		if err == nil {
-			log.Printf("Current leader: %s", string(leader.Kvs[0].Value))
-			if string(leader.Kvs[0].Value) != podName {
-				time.Sleep(1 * time.Second)
-				continue
-			}
-		}
-
-		log.Printf("Starting campaign for leadership...")
-		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-		if err := election.Campaign(ctx, podName); err != nil {
-			log.Printf("Failed to campaign: %v", err)
-			cancel()
-			time.Sleep(5 * time.Second)
+		leaderCh, err := leader.Campaign()
+		if err != nil {
+			isLeaderCh <- false
+			logger.Errorf(logger.Election, "failed to campaign: %v", err)
+			time.Sleep(1 * time.Second)
 			continue
 		}
-		defer cancel()
 
-		log.Printf("Pod %s became leader", podName)
+		logger.Infof(logger.Election, "pod %s became leader", podName)
+		isLeaderCh <- true
 
-	leaderLoop:
-		for {
-			select {
-			case <-session.Done():
-				log.Printf("Lost leadership due to session termination")
-				break leaderLoop
-			default:
-				for i := 0; i < 3; i++ {
-					targetPod := fmt.Sprintf("maroon-%d", i)
-					if targetPod != podName {
-						err := server.SendMessage(targetPod, fmt.Sprintf("Hello from leader %s", podName))
-						if err != nil {
-							log.Printf("Failed to send message to %s: %v", targetPod, err)
-						}
-					}
-				}
-				log.Printf("Leader is working. Ping")
-				time.Sleep(1 * time.Second)
-			}
-		}
+		// Wait for leadership loss
+		<-leaderCh
+		isLeaderCh <- false
+		logger.Infof(logger.Election, "lost leadership")
 
+		// this wait is for followers or for the leader who lost leadership to wait and start campaign again
 		time.Sleep(1 * time.Second)
 	}
+
+	// Unreachable
+	// TODO: add graceful shutdown
+	close(stopCh)
+	close(isLeaderCh)
 }
 
 type envVariables struct {
@@ -88,42 +82,17 @@ type envVariables struct {
 func envs() envVariables {
 	podName := os.Getenv("POD_NAME")
 	if podName == "" {
-		log.Fatal("POD_NAME environment variable is required")
+		logger.Fatalf(logger.Application, "POD_NAME environment variable is required")
 	}
 
 	etcdEndpoints := os.Getenv("ETCD_ENDPOINTS")
 	if etcdEndpoints == "" {
-		log.Fatal("ETCD_ENDPOINTS environment variable is required")
+		logger.Fatalf(logger.Application, "ETCD_ENDPOINTS environment variable is required")
 	}
 	endpoints := strings.Split(etcdEndpoints, ",")
 
 	return envVariables{
 		podName:       podName,
 		etcdEndpoints: endpoints,
-	}
-}
-
-func etcdSession(endpoints []string) (*concurrency.Session, func()) {
-	log.Printf("Connecting to etcd...")
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
-		DialTimeout: 5 * time.Second,
-	})
-	if err != nil {
-		log.Fatalf("failed to create etcd client: %v", err)
-	}
-	log.Printf("Connected to etcd successfully")
-
-	log.Printf("Creating etcd session...")
-	session, err := concurrency.NewSession(cli, concurrency.WithTTL(3))
-	if err != nil {
-		log.Fatalf("failed to create session: %v", err)
-	}
-
-	log.Printf("Session created successfully")
-
-	return session, func() {
-		session.Close()
-		cli.Close()
 	}
 }
