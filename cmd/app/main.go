@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -23,7 +22,8 @@ func main() {
 	logger.Infof(logger.Application, "Starting maroon pod: %s", podName)
 	logger.Infof(logger.Application, "Using etcd endpoints: %v", vars.etcdEndpoints)
 
-	server := NewTCPServer(8080)
+	// start TCP server
+	server, incomingMessages := NewTCPServer(8080)
 	go server.Start()
 
 	cli, err := clientv3.New(clientv3.Config{
@@ -38,44 +38,40 @@ func main() {
 
 	// watching hashes
 	watchChan := cli.Watch(context.Background(), hashesKey+"/", clientv3.WithPrefix())
-	go watchHashes(watchChan)
+
+	// Start application logic in a separate goroutine
+	stopCh := make(chan struct{})
+	isLeaderCh := make(chan bool)
+	go runApplication(cli, podName, server, isLeaderCh, incomingMessages, watchChan, stopCh)
+	isLeaderCh <- false
 
 	leader := election.NewLeader(cli, leaderKey, podName)
 
 	for {
 		leaderCh, err := leader.Campaign()
 		if err != nil {
+			isLeaderCh <- false
 			logger.Errorf(logger.Election, "failed to campaign: %v", err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
 		logger.Infof(logger.Election, "pod %s became leader", podName)
-
-		// Start application logic in a separate goroutine
-		stopCh := make(chan struct{})
-		go runApplication(cli, podName, server, stopCh)
+		isLeaderCh <- true
 
 		// Wait for leadership loss
 		<-leaderCh
-		close(stopCh)
+		isLeaderCh <- false
 		logger.Infof(logger.Election, "lost leadership")
 
+		// this wait is for followers or for the leader who lost leadership to wait and start campaign again
 		time.Sleep(1 * time.Second)
 	}
-}
 
-func watchHashes(watchChan clientv3.WatchChan) {
-	for resp := range watchChan {
-		for _, ev := range resp.Events {
-			switch ev.Type {
-			case clientv3.EventTypePut:
-				log.Printf("Received new hash: %s", string(ev.Kv.Value))
-			case clientv3.EventTypeDelete:
-				log.Printf("Hash deleted: %s", string(ev.Kv.Key))
-			}
-		}
-	}
+	// Unreachable
+	// TODO: add graceful shutdown
+	close(stopCh)
+	close(isLeaderCh)
 }
 
 type envVariables struct {

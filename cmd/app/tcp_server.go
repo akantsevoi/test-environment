@@ -8,13 +8,16 @@ import (
 )
 
 type TCPServer struct {
-	port int
+	port             int
+	incomingMessages chan []byte
 }
 
-func NewTCPServer(port int) *TCPServer {
+func NewTCPServer(port int) (*TCPServer, chan []byte) {
+	incomingMessages := make(chan []byte)
 	return &TCPServer{
-		port: port,
-	}
+		port:             port,
+		incomingMessages: incomingMessages,
+	}, incomingMessages
 }
 
 func (s *TCPServer) Start() {
@@ -44,17 +47,18 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 		return
 	}
 
-	message := string(buffer[:n])
-	logger.Infof(logger.Network, "Received message: %s", message)
+	logger.Infof(logger.Network, "Received message: %s", string(buffer[:n]))
+
+	s.incomingMessages <- buffer[:n]
 }
 
-func (s *TCPServer) SendMessage(targetPod string, message string) error {
+func (s *TCPServer) SendMessage(targetPod string, message []byte) error {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s.maroon:8080", targetPod))
 	if err != nil {
 		return fmt.Errorf("failed to connect to %s: %v", targetPod, err)
 	}
 	defer conn.Close()
 
-	_, err = conn.Write([]byte(message))
+	_, err = conn.Write(message)
 	return err
 }
