@@ -24,7 +24,7 @@ func main() {
 	logger.Infof(logger.Application, "Using etcd endpoints: %v", vars.etcdEndpoints)
 
 	// start TCP server
-	server, incomingMessages := p2p.New(podName, "8080")
+	server, confirmedTXs := p2p.New(podName, "8080")
 	server.UpdateHosts([]string{
 		"maroon-0:8080",
 		"maroon-1:8080",
@@ -47,7 +47,7 @@ func main() {
 	// Start application logic in a separate goroutine
 	stopCh := make(chan struct{})
 	isLeaderCh := make(chan bool)
-	go runApplication(cli, podName, server, isLeaderCh, incomingMessages, watchChan, stopCh)
+	go runApplication(server, isLeaderCh, confirmedTXs, watchChan, stopCh)
 	isLeaderCh <- false
 
 	leader := election.NewLeader(cli, leaderKey, podName)

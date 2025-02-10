@@ -16,10 +16,13 @@ import (
 type serv struct {
 	maroonv1.UnimplementedP2PServiceServer
 
-	// TODO: looks a bit like a hack. don't like it
 	grpc *grpc.Server
 
-	port    string
+	// port where to spin a service
+	port string
+
+	// dnsName that other nodes can reach this service back
+	// TODO: do I really need it?
 	dnsName string
 
 	toDistributeQueueCh chan Transaction
