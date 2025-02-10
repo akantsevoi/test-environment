@@ -19,8 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	P2PService_AddTx_FullMethodName    = "/P2PService/AddTx"
-	P2PService_AckBatch_FullMethodName = "/P2PService/AckBatch"
+	P2PService_AddTx_FullMethodName = "/P2PService/AddTx"
 )
 
 // P2PServiceClient is the client API for P2PService service.
@@ -28,7 +27,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type P2PServiceClient interface {
 	AddTx(ctx context.Context, in *AddTxRequest, opts ...grpc.CallOption) (*AddTxResponse, error)
-	AckBatch(ctx context.Context, in *AckBatchRequest, opts ...grpc.CallOption) (*AckBatchResponse, error)
 }
 
 type p2PServiceClient struct {
@@ -49,22 +47,11 @@ func (c *p2PServiceClient) AddTx(ctx context.Context, in *AddTxRequest, opts ...
 	return out, nil
 }
 
-func (c *p2PServiceClient) AckBatch(ctx context.Context, in *AckBatchRequest, opts ...grpc.CallOption) (*AckBatchResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AckBatchResponse)
-	err := c.cc.Invoke(ctx, P2PService_AckBatch_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // P2PServiceServer is the server API for P2PService service.
 // All implementations must embed UnimplementedP2PServiceServer
 // for forward compatibility.
 type P2PServiceServer interface {
 	AddTx(context.Context, *AddTxRequest) (*AddTxResponse, error)
-	AckBatch(context.Context, *AckBatchRequest) (*AckBatchResponse, error)
 	mustEmbedUnimplementedP2PServiceServer()
 }
 
@@ -77,9 +64,6 @@ type UnimplementedP2PServiceServer struct{}
 
 func (UnimplementedP2PServiceServer) AddTx(context.Context, *AddTxRequest) (*AddTxResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddTx not implemented")
-}
-func (UnimplementedP2PServiceServer) AckBatch(context.Context, *AckBatchRequest) (*AckBatchResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AckBatch not implemented")
 }
 func (UnimplementedP2PServiceServer) mustEmbedUnimplementedP2PServiceServer() {}
 func (UnimplementedP2PServiceServer) testEmbeddedByValue()                    {}
@@ -120,24 +104,6 @@ func _P2PService_AddTx_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _P2PService_AckBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AckBatchRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(P2PServiceServer).AckBatch(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: P2PService_AckBatch_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(P2PServiceServer).AckBatch(ctx, req.(*AckBatchRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // P2PService_ServiceDesc is the grpc.ServiceDesc for P2PService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -148,10 +114,6 @@ var P2PService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AddTx",
 			Handler:    _P2PService_AddTx_Handler,
-		},
-		{
-			MethodName: "AckBatch",
-			Handler:    _P2PService_AckBatch_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

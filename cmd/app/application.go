@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akantsevoi/test-environment/internal/p2p"
 	"github.com/akantsevoi/test-environment/pkg/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -51,7 +52,7 @@ type AckMessage struct {
 	Hashes []string
 }
 
-func runApplication(cli *clientv3.Client, podName string, server *TCPServer, isLeaderCh <-chan bool, tcpInCh <-chan []byte, etcdWatchCh clientv3.WatchChan, stopCh <-chan struct{}) {
+func runApplication(cli *clientv3.Client, podName string, server p2p.Transport, isLeaderCh <-chan bool, tcpInCh <-chan p2p.Message, etcdWatchCh clientv3.WatchChan, stopCh <-chan struct{}) {
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 

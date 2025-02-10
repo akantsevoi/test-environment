@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akantsevoi/test-environment/internal/p2p"
 	"github.com/akantsevoi/test-environment/pkg/election"
 	"github.com/akantsevoi/test-environment/pkg/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -23,7 +24,11 @@ func main() {
 	logger.Infof(logger.Application, "Using etcd endpoints: %v", vars.etcdEndpoints)
 
 	// start TCP server
-	server, incomingMessages := NewTCPServer(8080)
+	server, incomingMessages := p2p.New(podName, "8080")
+	server.UpdateHosts([]string{
+		"maroon-0:8080",
+		"maroon-1:8080",
+	})
 	go server.Start()
 
 	cli, err := clientv3.New(clientv3.Config{
