@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "github.com/akantsevoi/test-environment/gen/maroon/p2p/v1";
+
+service P2PService {
+  rpc AddTx (AddTxRequest) returns (AddTxResponse);
+}
+
+message AddTxRequest {
+  string from_node = 1;
+  string id = 2;
+  bytes payload = 3;
+}
+
+message AddTxResponse {
+  bool acced = 1;
+}

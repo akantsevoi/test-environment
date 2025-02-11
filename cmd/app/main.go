@@ -6,14 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akantsevoi/test-environment/internal/maroon"
+	"github.com/akantsevoi/test-environment/internal/p2p"
 	"github.com/akantsevoi/test-environment/pkg/election"
 	"github.com/akantsevoi/test-environment/pkg/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
-)
-
-const (
-	leaderKey = "/maroon/leader"
-	hashesKey = "/maroon/hashes"
 )
 
 func main() {
@@ -23,7 +20,11 @@ func main() {
 	logger.Infof(logger.Application, "Using etcd endpoints: %v", vars.etcdEndpoints)
 
 	// start TCP server
-	server, incomingMessages := NewTCPServer(8080)
+	server, confirmedTXsCh := p2p.New(podName, "8080")
+	server.UpdateHosts([]string{
+		"maroon-0:8080",
+		"maroon-1:8080",
+	})
 	go server.Start()
 
 	cli, err := clientv3.New(clientv3.Config{
@@ -37,15 +38,15 @@ func main() {
 	defer cli.Close()
 
 	// watching hashes
-	watchChan := cli.Watch(context.Background(), hashesKey+"/", clientv3.WithPrefix())
+	watchChan := cli.Watch(context.Background(), maroon.HashesKey+"/", clientv3.WithPrefix())
 
 	// Start application logic in a separate goroutine
 	stopCh := make(chan struct{})
 	isLeaderCh := make(chan bool)
-	go runApplication(cli, podName, server, isLeaderCh, incomingMessages, watchChan, stopCh)
+	go maroon.RunApplication(cli, server, isLeaderCh, confirmedTXsCh, watchChan, stopCh)
 	isLeaderCh <- false
 
-	leader := election.NewLeader(cli, leaderKey, podName)
+	leader := election.NewLeader(cli, maroon.LeaderKey, podName)
 
 	for {
 		leaderCh, err := leader.Campaign()
