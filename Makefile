@@ -4,9 +4,11 @@ install-tools:
 	# TODO: fix it for other platforms https://grpc.io/docs/protoc-installation/
 	# we need protoc tool
 	brew install protobuf
-	
+
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest	
+
+	go install go.uber.org/mock/mockgen
 
 gen:
 	mkdir -p gen
@@ -16,6 +18,9 @@ gen:
     	--go-grpc_out=gen \
 		--go-grpc_opt=paths=source_relative \
     	proto/maroon/p2p/v1/maroon.proto 
+
+	mockgen -source=internal/maroon/interface.go -destination=internal/maroon/mocks/interface_mock.go -package=mocks
+	mockgen -source=internal/p2p/interface.go -destination=internal/p2p/mocks/interface_mock.go -package=mocks
 
 build:
 	# worker container

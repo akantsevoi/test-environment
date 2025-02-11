@@ -4,23 +4,14 @@ option go_package = "github.com/akantsevoi/test-environment/gen/maroon/p2p/v1";
 
 service P2PService {
   rpc AddTx (AddTxRequest) returns (AddTxResponse);
-  rpc AckBatch (AckBatchRequest) returns (AckBatchResponse);
 }
 
 message AddTxRequest {
   string from_node = 1;
-  bytes payload = 2;
+  string id = 2;
+  bytes payload = 3;
 }
 
 message AddTxResponse {
-  bool success = 1;
-}
-
-message AckBatchRequest {
-  string from_node = 1;
-  string hash = 2;
-}
-
-message AckBatchResponse {
-  bool success = 1;
+  bool acced = 1;
 }

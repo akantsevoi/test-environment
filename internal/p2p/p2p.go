@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 
 	maroonv1 "github.com/akantsevoi/test-environment/gen/proto/maroon/p2p/v1"
 	"github.com/akantsevoi/test-environment/pkg/logger"
@@ -15,19 +16,20 @@ import (
 type serv struct {
 	maroonv1.UnimplementedP2PServiceServer
 
-	// TODO: looks a bit like a hack. don't like it
 	grpc *grpc.Server
 
-	port    string
+	// port where to spin a service
+	port string
+
+	// dnsName that other nodes can reach this service back
+	// TODO: do I really need it?
 	dnsName string
 
-	// messages that are coming from the network
-	inCh chan Message
-
-	// messages that we're going to send to some node
-	outCh chan Message
+	toDistributeQueueCh chan Transaction
+	distributedTxCh     chan TransactionDistributed
 
 	// key - hostname:port
+	// TODO: add info about regions as well
 	clients   map[string]hostInfo
 	clientsMu sync.RWMutex
 }
@@ -37,19 +39,23 @@ type hostInfo struct {
 	connection *grpc.ClientConn
 }
 
-func New(dnsName string, port string) (Transport, chan Message) {
-	inCh := make(chan Message)
+// wanted to explicitly return transactionDistributed channel here
+// to highlight uniqueness of ownership.
+//   - so it will be not possible to get channel in many places and consume and block it
+//   - makes sense?
+func New(dnsName string, port string) (Transport, chan TransactionDistributed) {
+	distributedCh := make(chan TransactionDistributed)
 	return &serv{
-		port:    port,
-		dnsName: dnsName,
-		inCh:    inCh,
-		outCh:   make(chan Message),
-	}, inCh
+		port:                port,
+		dnsName:             dnsName,
+		toDistributeQueueCh: make(chan Transaction),
+		distributedTxCh:     distributedCh,
+	}, distributedCh
 }
 
-func (s *serv) AddToQueue(m Message) {
+func (s *serv) DistributeTx(m Transaction) {
 	go func() {
-		s.outCh <- m
+		s.toDistributeQueueCh <- m
 	}()
 }
 
@@ -94,57 +100,43 @@ func (s *serv) UpdateHosts(newHosts []string) {
 }
 
 func (s *serv) serveOutboundMessageQueue() {
-	for m := range s.outCh {
+	for tx := range s.toDistributeQueueCh {
 
 		ctx := context.TODO()
+		// TODO: some algorithm on how to distribute
+		// which nodes/regions/etc
 
-		for _, client := range s.clientsForDestination(m.Destination) {
-			// TODO: herak-herak and run unit tests to confirm
-			// that it works as expected
-			// I'll do smth later to wrap it nicer
-			if len(m.AddTxData) > 0 {
+		// TODO: that lock is not right thing here
+		// I need to find a better way of replacing it
+		s.clientsMu.RLock()
+		var counterDistributed atomic.Int32
+		for _, hostI := range s.clients {
+			client := hostI.client
+			go func() {
 				resp, err := client.AddTx(ctx, &maroonv1.AddTxRequest{
 					FromNode: fmt.Sprintf("%v:%v", s.dnsName, s.port),
-					Payload:  m.AddTxData,
+					Id:       tx.ID,
+					Payload:  tx.TxData,
 				})
 				if err != nil {
 					logger.Errorf(logger.Network, "failed to send addTX message: %v", err)
-				}
-				log.Println("resp", resp, "err", err)
-			} else {
-				resp, err := client.AckBatch(ctx, &maroonv1.AckBatchRequest{
-					FromNode: fmt.Sprintf("%v:%v", s.dnsName, s.port),
-					Hash:     m.AckData,
-				})
-				if err != nil {
-					logger.Errorf(logger.Network, "failed to send ackBatch message: %v", err)
-				}
-				log.Println("resp", resp, "err", err)
-			}
-		}
-	}
-}
+				} else {
+					log.Println(tx.ID, "resp", resp, "err", err)
 
-func (s *serv) clientsForDestination(dest string) []maroonv1.P2PServiceClient {
-	// TODO: I don't like that lock
-	// should replace it with smth else later
-	s.clientsMu.RLock()
-	defer s.clientsMu.RUnlock()
+					// TODO: that's a very naive way of checking that it was distributed
+					// rethink it later and take regions into consideration
+					counterDistributed.Add(1)
+					if counterDistributed.Load() >= 2 {
+						s.distributedTxCh <- TransactionDistributed{
+							ID: tx.ID,
+						}
+						log.Println(tx.ID, "resp after put to distributed channel")
+					}
+				}
+			}()
+		}
 
-	if len(dest) == 0 {
-		var clients []maroonv1.P2PServiceClient
-		for _, h := range s.clients {
-			clients = append(clients, h.client)
-		}
-		return clients
-	} else {
-		host, ok := s.clients[dest]
-		if !ok {
-			logger.Errorf(logger.Network, "no such peer %v", dest)
-			return nil
-		}
-		return []maroonv1.P2PServiceClient{
-			host.client,
-		}
+		s.clientsMu.RUnlock()
+
 	}
 }

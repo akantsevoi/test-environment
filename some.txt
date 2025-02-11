@@ -1,0 +1,14 @@
+R - amount of regions
+N - amount of nodes in each region
+T - total amount of nodes
+L - leader node
+
+
+- L gets request
+- L propagates it to N needed nodes
+    - (R+1)/2 regions
+    - get acc from some amount of nodes in some amount of regions
+- when L gets ack for a transaction
+    - it can be included into the block(+ get sequence id)
+- after some amount of time or transactions block is finished and confirmed in etcd
+- other nodes will get it, if they don't have some transactions they will ask their neighbours for it
