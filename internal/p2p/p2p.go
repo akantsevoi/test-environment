@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -20,10 +19,6 @@ type serv struct {
 
 	// port where to spin a service
 	port string
-
-	// dnsName that other nodes can reach this service back
-	// TODO: do I really need it?
-	dnsName string
 
 	toDistributeQueueCh chan Transaction
 	distributedTxCh     chan TransactionDistributed
@@ -47,7 +42,6 @@ func New(dnsName string, port string) (Transport, chan TransactionDistributed) {
 	distributedCh := make(chan TransactionDistributed)
 	return &serv{
 		port:                port,
-		dnsName:             dnsName,
 		toDistributeQueueCh: make(chan Transaction),
 		distributedTxCh:     distributedCh,
 	}, distributedCh
@@ -114,9 +108,8 @@ func (s *serv) serveOutboundMessageQueue() {
 			client := hostI.client
 			go func() {
 				resp, err := client.AddTx(ctx, &maroonv1.AddTxRequest{
-					FromNode: fmt.Sprintf("%v:%v", s.dnsName, s.port),
-					Id:       tx.ID,
-					Payload:  tx.TxData,
+					Id:      tx.ID,
+					Payload: tx.TxData,
 				})
 				if err != nil {
 					logger.Errorf(logger.Network, "failed to send addTX message: %v", err)
