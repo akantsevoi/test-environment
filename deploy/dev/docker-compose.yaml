@@ -76,28 +76,6 @@ services:
         max-file: "5"
     restart: always
 
-  nginx:
-    image: nginx:alpine
-    hostname: nginx-etcd
-    volumes:
-      - type: bind
-        source: ./nginx/nginx.conf
-        target: /etc/nginx/nginx.conf
-    networks:
-     - etcd
-    ports:
-      - 2379:2379
-    depends_on:
-      - etcd-00
-      - etcd-01
-      - etcd-02
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "1m"
-        max-file: "5"
-    restart: always
-
 volumes:
   etcd-00vol:
     driver: local
