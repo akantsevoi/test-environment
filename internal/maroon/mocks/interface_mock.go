@@ -13,6 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
+	maroon "github.com/akantsevoi/test-environment/internal/maroon"
+	p2p "github.com/akantsevoi/test-environment/internal/p2p"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -59,4 +61,88 @@ func (mr *MockETCDMockRecorder) Put(ctx, key, val any, opts ...any) *gomock.Call
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, key, val}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockETCD)(nil).Put), varargs...)
+}
+
+// MockDistTransport is a mock of DistTransport interface.
+type MockDistTransport struct {
+	ctrl     *gomock.Controller
+	recorder *MockDistTransportMockRecorder
+	isgomock struct{}
+}
+
+// MockDistTransportMockRecorder is the mock recorder for MockDistTransport.
+type MockDistTransportMockRecorder struct {
+	mock *MockDistTransport
+}
+
+// NewMockDistTransport creates a new mock instance.
+func NewMockDistTransport(ctrl *gomock.Controller) *MockDistTransport {
+	mock := &MockDistTransport{ctrl: ctrl}
+	mock.recorder = &MockDistTransportMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockDistTransport) EXPECT() *MockDistTransportMockRecorder {
+	return m.recorder
+}
+
+// DistributeTx mocks base method.
+func (m_2 *MockDistTransport) DistributeTx(m p2p.Transaction) {
+	m_2.ctrl.T.Helper()
+	m_2.ctrl.Call(m_2, "DistributeTx", m)
+}
+
+// DistributeTx indicates an expected call of DistributeTx.
+func (mr *MockDistTransportMockRecorder) DistributeTx(m any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DistributeTx", reflect.TypeOf((*MockDistTransport)(nil).DistributeTx), m)
+}
+
+// MockApplication is a mock of Application interface.
+type MockApplication struct {
+	ctrl     *gomock.Controller
+	recorder *MockApplicationMockRecorder
+	isgomock struct{}
+}
+
+// MockApplicationMockRecorder is the mock recorder for MockApplication.
+type MockApplicationMockRecorder struct {
+	mock *MockApplication
+}
+
+// NewMockApplication creates a new mock instance.
+func NewMockApplication(ctrl *gomock.Controller) *MockApplication {
+	mock := &MockApplication{ctrl: ctrl}
+	mock.recorder = &MockApplicationMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockApplication) EXPECT() *MockApplicationMockRecorder {
+	return m.recorder
+}
+
+// AddOp mocks base method.
+func (m *MockApplication) AddOp(op maroon.Operation) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddOp", op)
+}
+
+// AddOp indicates an expected call of AddOp.
+func (mr *MockApplicationMockRecorder) AddOp(op any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddOp", reflect.TypeOf((*MockApplication)(nil).AddOp), op)
+}
+
+// Run mocks base method.
+func (m *MockApplication) Run(isLeaderCh <-chan bool, distributedTxCh <-chan p2p.TransactionDistributed, etcdWatchCh clientv3.WatchChan, stopCh <-chan struct{}) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Run", isLeaderCh, distributedTxCh, etcdWatchCh, stopCh)
+}
+
+// Run indicates an expected call of Run.
+func (mr *MockApplicationMockRecorder) Run(isLeaderCh, distributedTxCh, etcdWatchCh, stopCh any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockApplication)(nil).Run), isLeaderCh, distributedTxCh, etcdWatchCh, stopCh)
 }

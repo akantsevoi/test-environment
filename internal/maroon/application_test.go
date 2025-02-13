@@ -3,10 +3,12 @@ package maroon
 import (
 	"context"
 	"log"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/akantsevoi/test-environment/internal/p2p"
+	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -26,11 +28,12 @@ func (e *etcdMock) Put(ctx context.Context, key, val string, opts ...clientv3.Op
 	return e.put(ctx, key, val, opts...)
 }
 
-func TestApp(t *testing.T) {
-
+func TestCheckProofSentToETCD(t *testing.T) {
+	var etcdValueRequest string
 	etcd := &etcdMock{
 		put: func(ctx context.Context, key, val string, opts ...clientv3.OpOption) (*clientv3.PutResponse, error) {
 			log.Println("etcd", key, val)
+			etcdValueRequest = val
 			return &clientv3.PutResponse{}, nil
 		},
 	}
@@ -39,7 +42,7 @@ func TestApp(t *testing.T) {
 
 	serv := &servMock{
 		distr: func(tx p2p.Transaction) {
-			log.Println(tx)
+			log.Println("server imitation", tx)
 			go func() {
 				time.Sleep(10 * time.Millisecond)
 				opDistributedCh <- p2p.TransactionDistributed{
@@ -53,12 +56,27 @@ func TestApp(t *testing.T) {
 	etcdWatchCh := make(clientv3.WatchChan)
 	stopCh := make(chan struct{})
 
-	go RunApplication(etcd, serv, isLeaderCh, opDistributedCh, etcdWatchCh, stopCh)
+	app := New(etcd, serv)
+	go app.Run(isLeaderCh, opDistributedCh, etcdWatchCh, stopCh)
 	isLeaderCh <- true
 
-	time.Sleep(8 * time.Second)
+	op1, op2, op3 := Operation{OpType: PrintTimestamp, Value: "1"}, Operation{OpType: PrintTimestamp, Value: "2"}, Operation{OpType: PrintTimestamp, Value: "3"}
+
+	app.AddOp(op1)
+	app.AddOp(op2)
+	app.AddOp(op3)
+
+	time.Sleep(50 * time.Millisecond)
 	stopCh <- struct{}{}
 
-	time.Sleep(4 * time.Second)
-	t.Fail()
+	time.Sleep(50 * time.Millisecond)
+	require.ElementsMatch(t,
+		strings.Split(etcdValueRequest, ","),
+		[]string{
+			op1.Hash(),
+			op2.Hash(),
+			op3.Hash(),
+		},
+	)
+
 }

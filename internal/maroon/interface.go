@@ -14,3 +14,19 @@ type ETCD interface {
 type DistTransport interface {
 	DistributeTx(m p2p.Transaction)
 }
+
+type Application interface {
+	Run(isLeaderCh <-chan bool, distributedTxCh <-chan p2p.TransactionDistributed, etcdWatchCh clientv3.WatchChan, stopCh <-chan struct{})
+	AddOp(op Operation)
+}
+
+type OperationType int64
+
+const (
+	PrintTimestamp OperationType = iota
+)
+
+type Operation struct {
+	OpType OperationType
+	Value  string
+}

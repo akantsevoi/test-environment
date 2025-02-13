@@ -2,33 +2,21 @@ package maroon
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/akantsevoi/test-environment/internal/p2p"
 	"github.com/akantsevoi/test-environment/pkg/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-type OperationType int64
-
-const (
-	PrintTimestamp OperationType = iota
-)
-
-type Operation struct {
-	OpType OperationType
-	Value  string
+type application struct {
+	data
+	deps
 }
 
-// Leader specific
-var (
-
+type data struct {
 	// all the operations that were confirmed by the followers
 	// a slice because they have global order now
 	confirmedOps []Operation
@@ -37,42 +25,51 @@ var (
 	ackedHashes []string
 
 	// txs that were created and sent to the followers but not ack-ed yet
-	inFlyOPs map[string]Operation = make(map[string]Operation)
+	inFlyOPs map[string]Operation
 
 	// TODO: get rid of locks
-	opMU *sync.Mutex = &sync.Mutex{}
+	opMU *sync.Mutex
 
-	batchCounter int64 = 0
-)
+	batchCounter int64
 
-// / Follower specific
-var ()
-
-type AckMessage struct {
-	Hashes []string
+	isLeader bool
 }
 
-func RunApplication(cli ETCD, server DistTransport, isLeaderCh <-chan bool, distributedTxCh <-chan p2p.TransactionDistributed, etcdWatchCh clientv3.WatchChan, stopCh <-chan struct{}) {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+type deps struct {
+	cli      ETCD
+	p2pDistr DistTransport
+}
 
-	var isLeader bool
+func New(cli ETCD, p2pDistr DistTransport) *application {
+	return &application{
+		data: data{
+			inFlyOPs: make(map[string]Operation),
+			opMU:     &sync.Mutex{},
+		},
+		deps: deps{
+			cli:      cli,
+			p2pDistr: p2pDistr,
+		},
+	}
+}
+
+func (a *application) Run(isLeaderCh <-chan bool, distributedTxCh <-chan p2p.TransactionDistributed, etcdWatchCh clientv3.WatchChan, stopCh <-chan struct{}) {
 
 	for {
 		select {
 		case <-stopCh:
 			return
 		case isL := <-isLeaderCh:
-			isLeader = isL
+			a.isLeader = isL
 		case confirmation := <-distributedTxCh:
-			if !isLeader {
+			if !a.isLeader {
 				continue
 			}
 			logger.Infof(logger.Application, "tx %v confirmed", confirmation.ID)
-			issueBlockIfCan(cli, confirmation)
+			a.issueBlockIfCan(a.cli, confirmation)
 
 		case newEvent := <-etcdWatchCh:
-			if isLeader {
+			if a.isLeader {
 				// leader already knows about it
 				continue
 			}
@@ -80,71 +77,53 @@ func RunApplication(cli ETCD, server DistTransport, isLeaderCh <-chan bool, dist
 			_ = newEvent
 			// TODO: check that all the transactions with that hash are here
 			// and if there are not - start requesting them
-
-		case <-ticker.C: // main logic
-			if !isLeader {
-				// follower
-				continue
-			}
-
-			fakeNewOperation(server)
 		}
 	}
 }
 
-func issueBlockIfCan(cli ETCD, confirmation p2p.TransactionDistributed) {
-	opMU.Lock()
-	defer opMU.Unlock()
-	if _, ok := inFlyOPs[confirmation.ID]; !ok {
+func (a *application) issueBlockIfCan(cli ETCD, confirmation p2p.TransactionDistributed) {
+	a.opMU.Lock()
+	defer a.opMU.Unlock()
+	if _, ok := a.inFlyOPs[confirmation.ID]; !ok {
 		// TODO: just ignore. But would be nice to clarify how you've got them
 		return
 	}
 
-	ackedHashes = append(ackedHashes, confirmation.ID)
+	a.ackedHashes = append(a.ackedHashes, confirmation.ID)
 
-	if len(ackedHashes) >= 3 {
+	if len(a.ackedHashes) >= 3 {
 		// IMITATION!!!!
-		merkleHash := strings.Join(ackedHashes, ",")
-		_, err := cli.Put(context.TODO(), fmt.Sprintf("%s/%d", HashesKey, batchCounter), merkleHash)
+		merkleHash := strings.Join(a.ackedHashes, ",")
+		_, err := cli.Put(context.TODO(), fmt.Sprintf("%s/%d", HashesKey, a.batchCounter), merkleHash)
 		if err != nil {
 			logger.Errorf(logger.Application, "failed to put merkle hash: %v", err)
 			return
 		}
 
-		for _, hash := range ackedHashes {
-			op, ok := inFlyOPs[hash]
+		for _, hash := range a.ackedHashes {
+			op, ok := a.inFlyOPs[hash]
 			if !ok {
 				continue
 			}
-			confirmedOps = append(confirmedOps, op)
-			delete(inFlyOPs, hash)
+			a.confirmedOps = append(a.confirmedOps, op)
+			delete(a.inFlyOPs, hash)
 		}
-		ackedHashes = nil
+		a.ackedHashes = nil
 	}
 
 }
 
-func fakeNewOperation(server DistTransport) {
-	timestamp := time.Now().Unix()
-
-	/// new operation
-	newOp := Operation{
-		OpType: PrintTimestamp,
-		Value:  strconv.FormatInt(timestamp, 10),
-	}
-
-	message, err := json.Marshal(newOp)
-	if err != nil {
-		logger.Errorf(logger.Application, "Failed to marshal operation: %v", err)
+func (a *application) AddOp(op Operation) {
+	if !a.isLeader {
 		return
 	}
 
-	hashStr := fmt.Sprintf("%x", sha256.Sum256(message))
+	hashStr, message := op.HashBin()
 
-	opMU.Lock()
-	inFlyOPs[hashStr] = newOp
-	opMU.Unlock()
-	server.DistributeTx(p2p.Transaction{
+	a.opMU.Lock()
+	a.inFlyOPs[hashStr] = op
+	a.opMU.Unlock()
+	a.p2pDistr.DistributeTx(p2p.Transaction{
 		ID:     hashStr,
 		TxData: message,
 	})

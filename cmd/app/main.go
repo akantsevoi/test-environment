@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,13 +20,13 @@ func main() {
 	logger.Infof(logger.Application, "Starting maroon pod: %s", podName)
 	logger.Infof(logger.Application, "Using etcd endpoints: %v", vars.etcdEndpoints)
 
-	// start TCP server
-	server, confirmedTXsCh := p2p.New(podName, "8080")
-	server.UpdateHosts([]string{
+	// start TCP p2p distributor
+	p2pDistr, confirmedTXsCh := p2p.New(podName, "8080")
+	p2pDistr.UpdateHosts([]string{
 		"maroon-0:8080",
 		"maroon-1:8080",
 	})
-	go server.Start()
+	go p2pDistr.Start()
 
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   vars.etcdEndpoints,
@@ -43,10 +44,24 @@ func main() {
 	// Start application logic in a separate goroutine
 	stopCh := make(chan struct{})
 	isLeaderCh := make(chan bool)
-	go maroon.RunApplication(cli, server, isLeaderCh, confirmedTXsCh, watchChan, stopCh)
+	app := maroon.New(cli, p2pDistr)
+	go app.Run(isLeaderCh, confirmedTXsCh, watchChan, stopCh)
 	isLeaderCh <- false
 
 	leader := election.NewLeader(cli, maroon.LeaderKey, podName)
+
+	// imitation of incoming requests
+	go func() {
+		tickerCh := time.Tick(1 * time.Second)
+		for tick := range tickerCh {
+			timestamp := tick.Unix()
+
+			app.AddOp(maroon.Operation{
+				OpType: maroon.PrintTimestamp,
+				Value:  strconv.FormatInt(timestamp, 10),
+			})
+		}
+	}()
 
 	for {
 		leaderCh, err := leader.Campaign()

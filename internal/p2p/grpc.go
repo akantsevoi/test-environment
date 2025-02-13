@@ -12,14 +12,8 @@ func (s *serv) AddTx(_ context.Context, req *maroonv1.AddTxRequest) (*maroonv1.A
 	logger.Infof(logger.Network, "got message addtx: %v", req.String())
 
 	// TODO: imitate that we store transaction somewhere
+	// implement passing this tx to application layer
 	time.Sleep(30 * time.Millisecond)
-
-	// go func() {
-	// 	s.inCh <- Transaction{
-	// 		ID:     req.Id,
-	// 		TxData: req.Payload,
-	// 	}
-	// }()
 
 	return &maroonv1.AddTxResponse{Acced: true}, nil
 }
