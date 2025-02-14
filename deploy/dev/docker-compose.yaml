@@ -3,16 +3,15 @@ version: '3.8'
 services:
   etcd-00:
     image: quay.io/coreos/etcd:v3.5.0
-    hostname: etcd-00
     command:
       - etcd
       - --name=etcd-00
       - --data-dir=data.etcd
-      - --advertise-client-urls=http://etcd-00:2379
+      - --advertise-client-urls=http://dev-etcd-00-1:2379
       - --listen-client-urls=http://0.0.0.0:2379
-      - --initial-advertise-peer-urls=http://etcd-00:2380
+      - --initial-advertise-peer-urls=http://dev-etcd-00-1:2380
       - --listen-peer-urls=http://0.0.0.0:2380
-      - --initial-cluster=etcd-00=http://etcd-00:2380,etcd-01=http://etcd-01:2380,etcd-02=http://etcd-02:2380
+      - --initial-cluster=etcd-00=http://dev-etcd-00-1:2380,etcd-01=http://dev-etcd-01-1:2380,etcd-02=http://dev-etcd-02-1:2380
       - --initial-cluster-state=new
       - --initial-cluster-token=etcd-cluster-1
     volumes:
@@ -28,16 +27,15 @@ services:
 
   etcd-01:
     image: quay.io/coreos/etcd:v3.5.0
-    hostname: etcd-01
     command:
       - etcd
       - --name=etcd-01
       - --data-dir=data.etcd
-      - --advertise-client-urls=http://etcd-01:2379
+      - --advertise-client-urls=http://dev-etcd-01-1:2379
       - --listen-client-urls=http://0.0.0.0:2379
-      - --initial-advertise-peer-urls=http://etcd-01:2380
+      - --initial-advertise-peer-urls=http://dev-etcd-01-1:2380
       - --listen-peer-urls=http://0.0.0.0:2380
-      - --initial-cluster=etcd-00=http://etcd-00:2380,etcd-01=http://etcd-01:2380,etcd-02=http://etcd-02:2380
+      - --initial-cluster=etcd-00=http://dev-etcd-00-1:2380,etcd-01=http://dev-etcd-01-1:2380,etcd-02=http://dev-etcd-02-1:2380
       - --initial-cluster-state=new
       - --initial-cluster-token=etcd-cluster-1
     volumes:
@@ -53,16 +51,15 @@ services:
 
   etcd-02:
     image: quay.io/coreos/etcd:v3.5.0
-    hostname: etcd-02
     command:
       - etcd
       - --name=etcd-02
       - --data-dir=data.etcd
-      - --advertise-client-urls=http://etcd-02:2379
+      - --advertise-client-urls=http://dev-etcd-02-1:2379
       - --listen-client-urls=http://0.0.0.0:2379
-      - --initial-advertise-peer-urls=http://etcd-02:2380
+      - --initial-advertise-peer-urls=http://dev-etcd-02-1:2380
       - --listen-peer-urls=http://0.0.0.0:2380
-      - --initial-cluster=etcd-00=http://etcd-00:2380,etcd-01=http://etcd-01:2380,etcd-02=http://etcd-02:2380
+      - --initial-cluster=etcd-00=http://dev-etcd-00-1:2380,etcd-01=http://dev-etcd-01-1:2380,etcd-02=http://dev-etcd-02-1:2380
       - --initial-cluster-state=new
       - --initial-cluster-token=etcd-cluster-1
     volumes:
