@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  etcd-00:
+    image: quay.io/coreos/etcd:v3.5.0
+    command:
+      - etcd
+      - --name=etcd-00
+      - --data-dir=/data.etcd/etcd-00
+      - --advertise-client-urls=http://dev-etcd-00-1:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --initial-advertise-peer-urls=http://dev-etcd-00-1:2380
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-cluster=etcd-00=http://dev-etcd-00-1:2380,etcd-01=http://dev-etcd-01-1:2380,etcd-02=http://dev-etcd-02-1:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-cluster-1
+    volumes:
+      - etcd-data:/data.etcd
+    networks:
+      - etcd
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+    restart: always
+
+  etcd-01:
+    image: quay.io/coreos/etcd:v3.5.0
+    command:
+      - etcd
+      - --name=etcd-01
+      - --data-dir=/data.etcd/etcd-01
+      - --advertise-client-urls=http://dev-etcd-01-1:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --initial-advertise-peer-urls=http://dev-etcd-01-1:2380
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-cluster=etcd-00=http://dev-etcd-00-1:2380,etcd-01=http://dev-etcd-01-1:2380,etcd-02=http://dev-etcd-02-1:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-cluster-1
+    volumes:
+      - etcd-data:/data.etcd
+    networks:
+      - etcd
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+    restart: always
+
+  etcd-02:
+    image: quay.io/coreos/etcd:v3.5.0
+    command:
+      - etcd
+      - --name=etcd-02
+      - --data-dir=/data.etcd/etcd-02
+      - --advertise-client-urls=http://dev-etcd-02-1:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --initial-advertise-peer-urls=http://dev-etcd-02-1:2380
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-cluster=etcd-00=http://dev-etcd-00-1:2380,etcd-01=http://dev-etcd-01-1:2380,etcd-02=http://dev-etcd-02-1:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-cluster-1
+    volumes:
+      - etcd-data:/data.etcd
+    networks:
+      - etcd
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+    restart: always
+
+volumes:
+  etcd-data:
+    driver: local
+
+networks:
+  etcd:
+    driver: bridge
