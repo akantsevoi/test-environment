@@ -28,6 +28,7 @@ func main() {
 	})
 	go p2pDistr.Start()
 
+	logger.Infof(logger.Application, "Connecting etcd...")
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   vars.etcdEndpoints,
 		DialTimeout: 5 * time.Second,
@@ -38,6 +39,15 @@ func main() {
 	}
 	defer cli.Close()
 
+	ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
+	res, err := cli.Get(ctx, "/test")
+	if err != nil {
+		logger.Errorf(logger.Application, "failed to get etcd value: %v", err)
+		os.Exit(1)
+	}
+	logger.Infof(logger.Application, "etcd value: %v", res)
+
+	logger.Infof(logger.Application, "Start watching etcd...")
 	// watching hashes
 	watchChan := cli.Watch(context.Background(), maroon.HashesKey+"/", clientv3.WithPrefix())
 
@@ -64,6 +74,7 @@ func main() {
 	}()
 
 	for {
+		logger.Infof(logger.Application, "Start campaign...")
 		leaderCh, err := leader.Campaign()
 		if err != nil {
 			isLeaderCh <- false
