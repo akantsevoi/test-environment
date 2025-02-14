@@ -23,8 +23,8 @@ func main() {
 	// start TCP p2p distributor
 	p2pDistr, confirmedTXsCh := p2p.New(podName, "8080")
 	p2pDistr.UpdateHosts([]string{
-		"maroon-0:8080",
 		"maroon-1:8080",
+		"maroon-2:8080",
 	})
 	go p2pDistr.Start()
 
@@ -52,7 +52,7 @@ func main() {
 
 	// imitation of incoming requests
 	go func() {
-		tickerCh := time.Tick(1 * time.Second)
+		tickerCh := time.Tick(10 * time.Second)
 		for tick := range tickerCh {
 			timestamp := tick.Unix()
 
@@ -64,11 +64,12 @@ func main() {
 	}()
 
 	for {
+		const timeBetweenAttempts = 3 * time.Second
 		leaderCh, err := leader.Campaign()
 		if err != nil {
 			isLeaderCh <- false
 			logger.Errorf(logger.Election, "failed to campaign: %v", err)
-			time.Sleep(1 * time.Second)
+			time.Sleep(timeBetweenAttempts)
 			continue
 		}
 
@@ -81,7 +82,7 @@ func main() {
 		logger.Infof(logger.Election, "lost leadership")
 
 		// this wait is for followers or for the leader who lost leadership to wait and start campaign again
-		time.Sleep(1 * time.Second)
+		time.Sleep(timeBetweenAttempts)
 	}
 
 	// Unreachable

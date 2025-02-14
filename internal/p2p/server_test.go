@@ -33,4 +33,5 @@ func TestTransportCommunication(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	require.ElementsMatch(t, []string{"tx-1", "tx-2"}, distributed)
+	t.Fail()
 }

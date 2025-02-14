@@ -9,5 +9,6 @@ spec:
   - port: 8080
     name: tcp
     targetPort: 8080
+    protocol: TCP
   selector:
     app: maroon

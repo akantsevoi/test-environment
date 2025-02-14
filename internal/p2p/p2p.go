@@ -74,8 +74,10 @@ func (s *serv) UpdateHosts(newHosts []string) {
 			conn, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
 				// TODO: proper error handling
+				logger.Errorf(logger.Network, "failed to establish peer connection host: %v err: %v", host, err)
 				continue
 			}
+			logger.Infof(logger.Network, "connection established: %v", host)
 			s.clients[host] = hostInfo{
 				maroonv1.NewP2PServiceClient(conn),
 				conn,
@@ -106,6 +108,7 @@ func (s *serv) serveOutboundMessageQueue() {
 		var counterDistributed atomic.Int32
 		for _, hostI := range s.clients {
 			client := hostI.client
+			logger.Errorf(logger.Network, "connection state: %v", hostI.connection.GetState().String())
 			go func() {
 				resp, err := client.AddTx(ctx, &maroonv1.AddTxRequest{
 					Id:      tx.ID,

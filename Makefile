@@ -42,12 +42,12 @@ maroon-redeploy:
 	kubectl apply -f deploy/maroon/maroon-deployment.yaml
 
 cluster-start:
-	kind create cluster --config deploy/cluster/kind-config.yaml
+	# kind create cluster --config deploy/cluster/kind-config.yaml
 
-	kind load docker-image maroon:latest --name oltp-multi-region
+	# kind load docker-image maroon:latest --name oltp-multi-region
 
-	kubectl apply -f deploy/etcd/etcd-service.yaml
-	kubectl apply -f deploy/etcd/etcd.yaml
+	# kubectl apply -f deploy/etcd/etcd-service.yaml
+	# kubectl apply -f deploy/etcd/etcd.yaml
 	
 
 	echo 'wait etcd-0'
