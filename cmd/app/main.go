@@ -23,8 +23,8 @@ func main() {
 	// start TCP p2p distributor
 	p2pDistr, confirmedTXsCh := p2p.New(podName, "8080")
 	p2pDistr.UpdateHosts([]string{
-		"maroon-1:8080",
-		"maroon-2:8080",
+		"maroon-1.maroon:8080",
+		"maroon-2.maroon:8080",
 	})
 	go p2pDistr.Start()
 

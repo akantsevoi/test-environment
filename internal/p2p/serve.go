@@ -10,7 +10,7 @@ import (
 
 // Blocking function
 func (s *serv) Start() {
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%v", s.port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%v", s.port))
 	if err != nil {
 		panic(err)
 	}
