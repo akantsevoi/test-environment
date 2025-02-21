@@ -6,19 +6,19 @@ maroonNode
 - when range is closer to the end - requests the next one
 
 # maroonNode flow:
-- stores two offset vectors:
+- stores threee offset vectors:
 	- commited <(1,10), (2,8), (3,5)...>
-  - uncommitedMajority <(1,10), (2,13), (3,7)...>
+  	- uncommitedMajority <(1,10), (2,13), (3,7)...>
 	- uncommitedLocal <(1,10), (2,14), (3,7)...>
-    - uncommitedLocal is populated from the transactions spread by gateway and gossipped by other nodes
+- uncommitedLocal is populated from the transactions spread by gateway and gossipped by other nodes
 - periodically publishes it's uncommited vector to other nodes
   - by this it confirms that node stored transaction
 - "leader" listens to the `uncommited` updates from the other nodes and updates uncommitedMajority vector
   - for example it might look like:
 ```
-  NL <(1,10), (2,14), (3,7)...>
-	N2 <(1,10), (2,12), (3,6)...>
-	N3 <(1,11), (2,13), (3,7)...>
+NL <(1,10), (2,14), (3,7)...>
+N2 <(1,10), (2,12), (3,6)...>
+N3 <(1,11), (2,13), (3,7)...>
 ```
  then the uncommitedMajority will be `<(1,10), (2,13), (3,7)...>`
 - periodically takes uncommitedMajority and puts it to etcd
